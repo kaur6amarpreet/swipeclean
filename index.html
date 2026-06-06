@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SwipeClean</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #080808; --card: #111; --border: #1e1e1e;
+      --green: #4ADE80; --red: #F87171; --blue: #60A5FA; --amber: #FBBF24;
+      --text: #fff; --muted: #666; --nav-h: 72px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; background: var(--bg); color: var(--text); height: 100dvh; overflow: hidden; user-select: none; }
+    .screen { position: absolute; inset: 0; display: none; flex-direction: column; overflow: hidden; }
+    .screen.active { display: flex; }
+
+    /* NAV */
+    #nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h); background: rgba(8,8,8,.96); backdrop-filter: blur(20px); border-top: 1px solid var(--border); display: none; align-items: flex-start; justify-content: space-around; padding: 10px 0; z-index: 200; }
+    #nav.show { display: flex; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; cursor: pointer; color: var(--muted); transition: color .15s; flex: 1; padding: 4px 0; }
+    .nav-item.active { color: var(--green); }
+    .nav-item svg { width: 22px; height: 22px; }
+    .nav-item span { font-size: .65rem; font-weight: 600; letter-spacing: .3px; }
+
+    /* CONNECT */
+    #s-connect { align-items: center; justify-content: flex-start; padding: 56px 28px 40px; gap: 0; overflow-y: auto; }
+    .logo-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 32px; }
+    .logo-icon { font-size: 3rem; }
+    .logo-name { font-size: 2rem; font-weight: 800; letter-spacing: -1.5px; }
+    .logo-tag  { font-size: .82rem; color: var(--muted); }
+    .section-lbl { align-self: flex-start; font-size: .68rem; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+    .drives { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 28px; }
+    .drive-btn { display: flex; align-items: center; gap: 14px; padding: 15px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; cursor: pointer; transition: border-color .15s; width: 100%; text-align: left; }
+    .drive-btn:hover:not(:disabled) { border-color: #2a2a2a; }
+    .drive-btn.hi { border-color: var(--green); background: rgba(74,222,128,.05); }
+    .drive-btn:disabled { opacity: .45; cursor: default; }
+    .di { font-size: 1.5rem; flex-shrink: 0; }
+    .dinfo { flex: 1; }
+    .dname { font-size: .92rem; font-weight: 600; }
+    .dsub  { font-size: .73rem; color: var(--muted); margin-top: 1px; }
+    .dbadge { font-size: .63rem; font-weight: 700; padding: 3px 8px; background: rgba(74,222,128,.12); color: var(--green); border-radius: 10px; border: 1px solid rgba(74,222,128,.25); flex-shrink: 0; }
+    .dsoon  { font-size: .63rem; font-weight: 600; padding: 3px 8px; background: rgba(255,255,255,.04); color: var(--muted); border-radius: 10px; border: 1px solid var(--border); flex-shrink: 0; }
+    #addFolderBtn { display: none; align-items: center; gap: 10px; padding: 11px 14px; background: transparent; border: 1px dashed #2a2a2a; border-radius: 13px; cursor: pointer; width: 100%; text-align: left; font-size: .82rem; color: var(--muted); margin-top: -4px; }
+    #addFolderBtn.show { display: flex; }
+    #addFolderBtn:hover { border-color: #444; color: #aaa; }
+    #extraDirsInfo { font-size: .73rem; color: var(--blue); display: none; margin-top: -14px; margin-bottom: 4px; padding: 0 4px; }
+    #extraDirsInfo.show { display: block; }
+
+    /* SCAN */
+    #s-scan { align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 40px; }
+    .scan-ring { position: relative; width: 130px; height: 130px; }
+    .scan-ring svg { width: 130px; height: 130px; transform: rotate(-90deg); }
+    .srt { fill: none; stroke: var(--border); stroke-width: 7; }
+    .srf { fill: none; stroke: url(#sGrad); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 366.5; stroke-dashoffset: 366.5; transition: stroke-dashoffset .3s; }
+    .scan-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .scan-pct { font-size: 1.5rem; font-weight: 800; }
+    .scan-lbl { font-size: .63rem; color: var(--muted); }
+    #s-scan h2 { font-size: 1.2rem; font-weight: 700; }
+    #scanMsg { font-size: .82rem; color: var(--muted); }
+    #dupMsg  { font-size: .78rem; color: var(--blue); min-height: 1.2em; }
+    #faceMsg { font-size: .76rem; color: #9B8ED8; min-height: 1.1em; }
+
+    /* DASHBOARD */
+    #s-dashboard { overflow-y: auto; padding-bottom: calc(var(--nav-h) + 8px); }
+    .dash-head { padding: 18px 20px 0; display: flex; align-items: center; justify-content: space-between; }
+    .dash-head h1 { font-size: 1.2rem; font-weight: 800; }
+    .rescan { font-size: .76rem; color: var(--muted); background: none; border: none; cursor: pointer; }
+    .storage-hero { display: flex; flex-direction: column; align-items: center; padding: 24px 20px 16px; gap: 8px; }
+    .big-ring { position: relative; width: 170px; height: 170px; }
+    .big-ring svg { width: 170px; height: 170px; transform: rotate(-90deg); }
+    .brt { fill: none; stroke: var(--border); stroke-width: 10; }
+    .brf { fill: none; stroke: url(#ringGrad); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 490.1; stroke-dashoffset: 490.1; transition: stroke-dashoffset 1.3s cubic-bezier(.4,0,.2,1); }
+    .big-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .brn { font-size: 2rem; font-weight: 900; letter-spacing: -2px; color: var(--green); }
+    .brl { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .storage-sub { font-size: .8rem; color: var(--muted); }
+    .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; padding: 0 14px 14px; }
+    .bk { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 5px; }
+    .bk .bi { font-size: 1.2rem; }
+    .bk .bn { font-size: 1.2rem; font-weight: 800; }
+    .bk .bl { font-size: .7rem; color: var(--muted); }
+    .bk .bs { font-size: .78rem; color: var(--green); font-weight: 600; }
+    .insights { padding: 0 14px 8px; display: flex; flex-direction: column; gap: 8px; }
+    .ins-card { background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 13px 14px; display: flex; align-items: flex-start; gap: 11px; }
+    .ins-card .ii { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .ins-card .it { font-size: .8rem; color: #aaa; line-height: 1.45; }
+    .ins-card .it strong { color: var(--text); }
+    .start-wrap { padding: 6px 14px 8px; }
+    .btn-full { width: 100%; padding: 16px; background: var(--green); color: #000; border: none; border-radius: 17px; font-size: .95rem; font-weight: 800; cursor: pointer; transition: opacity .15s, transform .1s; }
+    .btn-full:hover { opacity: .9; }
+    .btn-full:active { transform: scale(.98); }
+
+    /* SMART COLLECTIONS */
+    .sc-label { padding: 4px 14px 8px; font-size: .68rem; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
+    .sc-label .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: #9B8ED8; display: inline-block; margin-right: 5px; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .sc-row { display: flex; gap: 9px; padding: 0 14px 14px; overflow-x: auto; scrollbar-width: none; }
+    .sc-row::-webkit-scrollbar { display: none; }
+    .sc-chip { flex-shrink: 0; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 82px; text-align: center; cursor: pointer; transition: border-color .15s; }
+    .sc-chip:hover { border-color: #2a2a2a; }
+    .sc-chip .sci { font-size: 1.3rem; }
+    .sc-chip .scn { font-size: 1rem; font-weight: 800; }
+    .sc-chip .scl { font-size: .64rem; color: var(--muted); }
+    #aiStatusBar { font-size: .73rem; color: #9B8ED8; padding: 0 14px 8px; min-height: 1em; display: flex; align-items: center; gap: 6px; }
+
+    /* SWIPE */
+    #s-swipe { background: var(--bg); padding-bottom: var(--nav-h); }
+    #swipeTop { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; flex-shrink: 0; }
+    #progressText { font-size: .78rem; color: var(--muted); }
+    #selBadge { display: flex; align-items: center; gap: 6px; background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.25); border-radius: 20px; padding: 5px 14px; font-size: .8rem; color: var(--green); font-weight: 600; cursor: pointer; }
+    #swipeBar { margin: 10px 20px 0; height: 3px; background: #161616; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+    #swipeBarFill { height: 100%; background: linear-gradient(90deg, var(--green), var(--blue)); border-radius: 10px; transition: width .3s; }
+    #dupBanner { display: none; align-items: center; justify-content: center; gap: 7px; margin: 8px 20px 0; padding: 7px 14px; background: rgba(96,165,250,.07); border: 1px solid rgba(96,165,250,.18); border-radius: 10px; font-size: .76rem; color: var(--blue); flex-shrink: 0; }
+    #dupBanner.show { display: flex; }
+
+    /* FILTER BAR */
+    #filterBar { display: flex; gap: 7px; padding: 8px 14px 4px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+    #filterBar::-webkit-scrollbar { display: none; }
+    .filt { padding: 5px 13px; border-radius: 20px; border: 1px solid var(--border); background: #111; color: var(--muted); font-size: .73rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: all .15s; flex-shrink: 0; }
+    .filt.active { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.35); color: var(--green); }
+    .filt[data-f="blurry"].active { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.3); color: var(--red); }
+    .filt[data-f="excellent"].active { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.35); color: var(--green); }
+
+    #cardArea { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 8px 12px; }
+    .bg-card { position: absolute; width: min(480px, calc(100vw - 24px)); height: calc(100% - 16px); border-radius: 22px; background: #0e0e0e; pointer-events: none; border: 1px solid var(--border); }
+    #mainCard { position: absolute; width: min(480px, calc(100vw - 24px)); height: calc(100% - 16px); border-radius: 22px; overflow: hidden; box-shadow: 0 28px 70px rgba(0,0,0,.75); cursor: grab; touch-action: none; will-change: transform; transform-origin: bottom center; z-index: 10; }
+    #mainCard:active { cursor: grabbing; }
+    #mainCard img { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; pointer-events: none; }
+    .sov { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; }
+    .sov.keep { background: rgba(74,222,128,.25); }
+    .sov.skip { background: rgba(248,113,113,.25); }
+    .sov.org  { background: rgba(96,165,250,.25); }
+    .slbl { font-size: 1.8rem; font-weight: 900; letter-spacing: 3px; border: 4px solid; border-radius: 10px; padding: 5px 16px; }
+    .keep .slbl { color: var(--green); border-color: var(--green); transform: rotate(-15deg); }
+    .skip .slbl { color: var(--red);   border-color: var(--red);   transform: rotate(15deg); }
+    .org  .slbl { color: var(--blue);  border-color: var(--blue);  transform: rotate(-8deg); }
+    .card-bottom { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.9)); padding: 40px 16px 16px; pointer-events: none; }
+    .cn { font-size: .82rem; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cm { font-size: .72rem; color: #777; margin-top: 3px; }
+
+    /* QUALITY BADGE */
+    .q-badge { position: absolute; top: 12px; right: 12px; padding: 4px 10px; border-radius: 12px; font-size: .7rem; font-weight: 700; backdrop-filter: blur(8px); display: none; pointer-events: none; }
+    .q-badge.excellent { display: block; background: rgba(74,222,128,.2); color: var(--green); border: 1px solid rgba(74,222,128,.4); }
+    .q-badge.good      { display: block; background: rgba(96,165,250,.15); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+    .q-badge.review    { display: block; background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+    .q-badge.poor      { display: block; background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+
+    /* SCENE BADGE */
+    .scene-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 12px; font-size: .7rem; font-weight: 700; backdrop-filter: blur(8px); display: none; pointer-events: none; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); color: #ccc; }
+    .scene-badge.show { display: block; }
+
+    #dupPanel { display: none; position: absolute; inset: 8px; background: #0d0d0d; border: 1px solid var(--border); border-radius: 22px; overflow: hidden; flex-direction: column; z-index: 10; }
+    #dupPanel.show { display: flex; }
+    #dupHead { padding: 12px 16px; font-size: .8rem; color: var(--blue); font-weight: 700; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+    #dupHead .zoom-hint { font-size: .68rem; color: var(--muted); font-weight: 400; }
+    #dupGrid { display: grid; gap: 4px; padding: 4px; overflow-y: auto; flex: 1; }
+    .dt { position: relative; aspect-ratio: 3/2; border-radius: 12px; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .15s; }
+    .dt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .dt.on { border-color: var(--green); }
+    .dt .dc { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s; }
+    .dt.on .dc { opacity: 1; }
+    .dt .dc svg { width: 13px; height: 13px; }
+    .dt .dn { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.8); font-size: .68rem; padding: 6px 8px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dt .zoom-btn { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; background: rgba(0,0,0,.6); border: none; border-radius: 8px; color: #fff; font-size: .8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #dupActions { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .da { flex: 1; padding: 12px; border: none; border-radius: 12px; font-size: .86rem; font-weight: 600; cursor: pointer; }
+    .da.keep { background: rgba(74,222,128,.1); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+    .da.skip { background: rgba(248,113,113,.07); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+    /* LIGHTBOX */
+    #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.97); z-index: 800; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+    #lightbox.open { display: flex; }
+    #lbImg { max-width: 100vw; max-height: calc(100dvh - 80px); object-fit: contain; border-radius: 4px; }
+    #lbClose { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #lbName { font-size: .78rem; color: var(--muted); }
+    #lbHint { font-size: .7rem; color: #333; }
+
+    #actions { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 20px 16px; flex-shrink: 0; }
+    .act { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; transition: transform .1s; }
+    .act:active { transform: scale(.91); }
+    .ring { border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid; }
+    .act span { font-size: .68rem; font-weight: 600; }
+    .a-skip .ring { width: 54px; height: 54px; border-color: var(--red);   color: var(--red); }
+    .a-keep .ring { width: 68px; height: 68px; border-color: var(--green); color: var(--green); }
+    .a-org  .ring { width: 54px; height: 54px; border-color: var(--blue);  color: var(--blue); }
+    .a-done .ring { width: 44px; height: 44px; border-color: #333; color: var(--muted); }
+    .a-bulk .ring { width: 44px; height: 44px; border-color: #3a3020; color: var(--amber); }
+    /* EMPTY FILTER STATE */
+    #emptyFilter { display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 32px; }
+    #emptyFilter.show { display: flex; }
+    #emptyFilter .ef-icon { font-size: 3rem; }
+    #emptyFilter .ef-title { font-size: 1rem; font-weight: 700; }
+    #emptyFilter .ef-sub { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+    #emptyFilter .ef-reset { margin-top: 4px; padding: 12px 28px; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid rgba(74,222,128,.3); border-radius: 50px; font-size: .88rem; font-weight: 700; cursor: pointer; }
+    .a-skip span { color: var(--red); }
+    .a-keep span { color: var(--green); }
+    .a-org  span { color: var(--blue); }
+    .a-done span { color: var(--muted); }
+    .a-bulk span { color: var(--amber); }
+
+    /* ORGANIZE SHEET */
+    #s-org { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; }
+    #s-org.show { display: flex; }
+    .org-sheet { width: 100%; max-width: 480px; background: #111; border-radius: 26px 26px 0 0; border-top: 1px solid var(--border); padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 14px; }
+    .handle { width: 36px; height: 4px; background: #333; border-radius: 4px; align-self: center; margin-bottom: 2px; }
+    .org-sheet h3 { font-size: 1rem; font-weight: 700; }
+    .org-sheet p  { font-size: .8rem; color: var(--muted); }
+    #orgInput { background: #1a1a1a; border: 1px solid var(--border); border-radius: 13px; padding: 13px 15px; color: #fff; font-size: .92rem; outline: none; width: 100%; }
+    #orgInput:focus { border-color: var(--blue); }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip { padding: 7px 13px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; font-size: .78rem; color: #aaa; cursor: pointer; }
+    .chip:hover { background: #222; border-color: #444; }
+    .org-actions { display: flex; gap: 10px; }
+    .btn-blue { flex: 1; padding: 13px; background: var(--blue); color: #000; border: none; border-radius: 13px; font-size: .9rem; font-weight: 700; cursor: pointer; }
+    .btn-ghost { padding: 13px 18px; background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 13px; font-size: .86rem; cursor: pointer; }
+
+    /* BULK SHEET */
+    #bulkSheet { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; }
+    #bulkSheet.show { display: flex; }
+    .bulk-inner { width: 100%; max-width: 480px; background: #111; border-radius: 26px 26px 0 0; border-top: 1px solid var(--border); padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 10px; }
+    .bulk-inner h3 { font-size: 1rem; font-weight: 700; margin-bottom: 2px; }
+    .bulk-opt { display: flex; align-items: center; gap: 12px; padding: 13px 15px; background: #161616; border: 1px solid var(--border); border-radius: 13px; cursor: pointer; width: 100%; text-align: left; transition: border-color .15s; }
+    .bulk-opt:hover { border-color: #333; }
+    .bulk-opt .bo-icon { font-size: 1.3rem; width: 32px; text-align: center; flex-shrink: 0; }
+    .bo-name { font-size: .88rem; font-weight: 600; }
+    .bo-sub  { font-size: .73rem; color: var(--muted); margin-top: 2px; }
+
+    /* RECOVERY */
+    #s-recovery { overflow-y: auto; padding-bottom: calc(var(--nav-h) + 8px); }
+    .rec-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .rec-head h2 { font-size: 1.1rem; font-weight: 700; }
+    .rec-head .purge { font-size: .76rem; color: var(--red); background: none; border: none; cursor: pointer; }
+    .rec-sec { padding: 12px 16px 4px; font-size: .68rem; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .rec-empty { padding: 60px 32px; text-align: center; color: var(--muted); font-size: .88rem; }
+    .rec-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .rec-thumb { width: 50px; height: 50px; border-radius: 9px; object-fit: cover; background: var(--card); flex-shrink: 0; }
+    .rec-info { flex: 1; min-width: 0; }
+    .rec-name { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rec-sz   { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .rec-restore { padding: 7px 13px; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid rgba(74,222,128,.25); border-radius: 9px; font-size: .74rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+    /* DONE */
+    #s-done { align-items: center; justify-content: center; gap: 16px; padding: 40px 32px; text-align: center; position: relative; overflow-y: auto; }
+    #confetti-cv { position: absolute; inset: 0; pointer-events: none; }
+    .done-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 320px; }
+    .done-big { font-size: 5rem; font-weight: 900; letter-spacing: -4px; color: var(--green); }
+    #s-done h2 { font-size: 1.4rem; font-weight: 800; }
+    .done-stats { display: flex; gap: 10px; width: 100%; }
+    .ds { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 13px 10px; text-align: center; }
+    .ds .dn { font-size: 1.2rem; font-weight: 800; }
+    .ds .dl { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+    .done-acts { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+    .folder-save-row { display: flex; gap: 8px; width: 100%; }
+    #saveFolderInput { flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px; padding: 14px 16px; color: #fff; font-size: .92rem; outline: none; min-width: 0; }
+    #saveFolderInput:focus { border-color: var(--green); }
+    .folder-save-row .btn-full { flex-shrink: 0; width: auto; padding: 14px 22px; border-radius: 14px; font-size: .92rem; }
+    #saveStatus { font-size: .8rem; color: var(--muted); text-align: center; min-height: 1.1em; }
+
+    /* AI MEMORY INSIGHTS */
+    .ai-insights { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .ai-insights-title { font-size: .68rem; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; text-align: left; padding: 4px 0 0; }
+    .ai-card { background: var(--card); border: 1px solid var(--border); border-radius: 13px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; text-align: left; }
+    .ai-card .aii { font-size: 1.1rem; flex-shrink: 0; }
+    .ai-card .ait { font-size: .78rem; color: #aaa; line-height: 1.45; }
+    .ai-card .ait strong { color: var(--text); }
+
+    /* PEOPLE SCREEN */
+    #s-people { overflow-y: auto; padding-bottom: calc(var(--nav-h) + 8px); }
+    .people-head { padding: 18px 20px 6px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .people-head h1 { font-size: 1.2rem; font-weight: 800; }
+    .people-status { font-size: .74rem; color: var(--muted); }
+    .people-loading { padding: 60px 32px; text-align: center; color: var(--muted); font-size: .88rem; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .people-loading .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: #9B8ED8; display: inline-block; animation: pulse 1.5s infinite; }
+    .people-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 12px 16px; }
+    .person-card { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+    .person-card:active .person-avatar-wrap { transform: scale(.93); }
+    .person-avatar-wrap { position: relative; transition: transform .15s; }
+    .person-avatar { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border); background: #1a1a1a; display: block; }
+    .person-avatar.placeholder { display: flex; align-items: center; justify-content: center; font-size: 2.2rem; border: 2px dashed #2a2a2a; }
+    .person-avatar-ring { position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent; transition: border-color .2s; }
+    .person-card:hover .person-avatar-ring { border-color: var(--green); }
+    .person-name { font-size: .8rem; font-weight: 700; color: var(--text); text-align: center; }
+    .person-count { font-size: .68rem; color: var(--muted); text-align: center; }
+
+    /* PERSON PHOTOS SCREEN */
+    #s-person-photos { display: none; flex-direction: column; overflow: hidden; }
+    #s-person-photos.active { display: flex; }
+    .person-photos-head { padding: 14px 16px 12px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #personBackBtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .9rem; padding: 4px 8px 4px 0; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+    .person-photos-title { flex: 1; }
+    .person-photos-title h2 { font-size: 1rem; font-weight: 800; }
+    .person-photos-title p { font-size: .72rem; color: var(--muted); margin-top: 1px; }
+    #personSelCount { font-size: .78rem; font-weight: 700; color: var(--green); flex-shrink: 0; }
+    #personPhotosGrid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; padding: 3px; }
+    .pp-thumb { position: relative; aspect-ratio: 1; overflow: hidden; cursor: pointer; border-radius: 4px; }
+    .pp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .15s; }
+    .pp-thumb .pp-check { position: absolute; top: 7px; right: 7px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); background: rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .pp-thumb.selected .pp-check { background: var(--green); border-color: var(--green); }
+    .pp-thumb.selected .pp-check::after { content:''; display:block; width:10px; height:7px; border-left:2px solid #000; border-bottom:2px solid #000; transform:rotate(-45deg) translateY(-1px); }
+    .pp-thumb:not(.selected) img { opacity: .55; }
+    .pp-thumb:not(.selected) .pp-check::after { display: none; }
+    .person-photos-actions { padding: 12px 16px 28px; display: flex; gap: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    #personAddBtn { flex: 1; padding: 14px; background: var(--green); color: #000; border: none; border-radius: 14px; font-size: .92rem; font-weight: 800; cursor: pointer; }
+    #personSwipeBtn { padding: 14px 18px; background: none; color: var(--blue); border: 1px solid rgba(96,165,250,.3); border-radius: 14px; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+    /* FEEDBACK PILL */
+    #recFb { position: fixed; bottom: calc(var(--nav-h) + 70px); left: 50%; transform: translateX(-50%) scale(.7); background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.3); border-radius: 16px; padding: 12px 24px; text-align: center; display: none; z-index: 600; transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s; opacity: 0; }
+    #recFb.show { display: block; transform: translateX(-50%) scale(1); opacity: 1; }
+    .rf-n { font-size: 1.4rem; font-weight: 900; color: var(--green); }
+    .rf-t { font-size: .72rem; color: #888; margin-top: 2px; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: calc(var(--nav-h) + 10px); left: 50%; transform: translateX(-50%) translateY(90px); background: var(--card); border: 1px solid var(--border); border-radius: 50px; padding: 10px 20px; font-size: .84rem; white-space: nowrap; transition: transform .35s cubic-bezier(.34,1.56,.64,1); z-index: 500; pointer-events: none; max-width: 88vw; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<canvas id="confetti-cv" style="position:fixed;inset:0;pointer-events:none;z-index:1000;display:none;"></canvas>
+
+<!-- NAV -->
+<nav id="nav">
+  <button class="nav-item active" data-screen="s-dashboard" id="nav-home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+    <span>Home</span>
+  </button>
+  <button class="nav-item" data-screen="s-swipe" id="nav-clean">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+    <span>Clean</span>
+  </button>
+  <button class="nav-item" data-screen="s-people" id="nav-people">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <span>People</span>
+  </button>
+  <button class="nav-item" data-screen="s-recovery" id="nav-rec">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+    <span>Recovery</span>
+  </button>
+</nav>
+
+<!-- CONNECT -->
+<div class="screen active" id="s-connect">
+  <div class="logo-wrap">
+    <div class="logo-icon">🧹</div>
+    <div class="logo-name">SwipeClean</div>
+    <div class="logo-tag">AI-powered photo curation</div>
+  </div>
+  <div class="section-lbl">Connect Your Storage</div>
+  <div class="drives">
+    <button class="drive-btn hi" id="openBtn">
+      <div class="di">📁</div>
+      <div class="dinfo"><div class="dname">Device Storage</div><div class="dsub">Open any folder from your Mac</div></div>
+      <div class="dbadge">Ready</div>
+    </button>
+    <button class="drive-btn" disabled>
+      <div class="di">🔵</div>
+      <div class="dinfo"><div class="dname">Google Drive</div><div class="dsub">Connect your Google account</div></div>
+      <div class="dsoon">Soon</div>
+    </button>
+    <button class="drive-btn" disabled>
+      <div class="di">🟦</div>
+      <div class="dinfo"><div class="dname">Dropbox</div><div class="dsub">Connect your Dropbox account</div></div>
+      <div class="dsoon">Soon</div>
+    </button>
+    <button class="drive-btn" disabled>
+      <div class="di">☁️</div>
+      <div class="dinfo"><div class="dname">OneDrive</div><div class="dsub">Connect your Microsoft account</div></div>
+      <div class="dsoon">Soon</div>
+    </button>
+  </div>
+  <button id="addFolderBtn">
+    <span style="font-size:1rem">＋</span> Add another folder to this session
+  </button>
+  <div id="extraDirsInfo"></div>
+  <p style="font-size:.7rem;color:#333;text-align:center;margin-top:8px">Chrome only · No upload · Files stay private · AI runs in browser</p>
+</div>
+
+<!-- SCAN -->
+<div class="screen" id="s-scan">
+  <div class="scan-ring">
+    <svg viewBox="0 0 130 130"><defs><linearGradient id="sGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#4ADE80"/><stop offset="100%" stop-color="#60A5FA"/></linearGradient></defs>
+      <circle class="srt" cx="65" cy="65" r="58.3"/>
+      <circle class="srf" id="scanRingFill" cx="65" cy="65" r="58.3"/>
+    </svg>
+    <div class="scan-inner"><div class="scan-pct" id="scanPct">0%</div><div class="scan-lbl">scanned</div></div>
+  </div>
+  <h2>Analyzing Photos</h2>
+  <p id="scanMsg">Loading…</p>
+  <p id="dupMsg"></p>
+  <p id="faceMsg"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div class="screen" id="s-dashboard">
+  <div class="dash-head"><h1>Storage Report</h1><button class="rescan" id="rescanBtn">↺ Rescan</button></div>
+  <div class="storage-hero">
+    <div class="big-ring">
+      <svg viewBox="0 0 170 170"><defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#4ADE80"/><stop offset="100%" stop-color="#60A5FA"/></linearGradient></defs>
+        <circle class="brt" cx="85" cy="85" r="78"/>
+        <circle class="brf" id="bigRingFill" cx="85" cy="85" r="78"/>
+      </svg>
+      <div class="big-ring-center"><div class="brn" id="ringNum">—</div><div class="brl">to recover</div></div>
+    </div>
+    <div class="storage-sub" id="storageSub">Open a folder to scan</div>
+  </div>
+  <div class="breakdown" id="breakdown"></div>
+  <div id="aiStatusBar"></div>
+  <div id="smartColl"></div>
+  <div class="insights" id="insights"></div>
+  <div class="start-wrap"><button class="btn-full" id="startBtn">Start Swiping →</button></div>
+</div>
+
+<!-- SWIPE -->
+<div class="screen" id="s-swipe">
+  <div id="swipeTop">
+    <span id="progressText">— / —</span>
+    <div id="selBadge">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1.5,6 4.5,9 10.5,3"/></svg>
+      <span id="selCount">0 kept</span>
+    </div>
+  </div>
+  <div id="swipeBar"><div id="swipeBarFill"></div></div>
+  <div id="filterBar">
+    <button class="filt active" data-f="all">All</button>
+    <button class="filt" data-f="excellent">⭐ Sharp</button>
+    <button class="filt" data-f="blurry">🔴 Blurry</button>
+    <button class="filt" data-f="individual">👤 Individual</button>
+    <button class="filt" data-f="couple">👥 Couple</button>
+    <button class="filt" data-f="group">👨‍👩‍👧 Group</button>
+  </div>
+  <div id="dupBanner">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="9" height="9" rx="1.5"/><path d="M4 3V2a1 1 0 011-1h7a1 1 0 011 1v7a1 1 0 01-1 1h-1"/></svg>
+    <span id="dupBannerText">Similar photos detected</span>
+  </div>
+  <div id="cardArea">
+    <div id="emptyFilter">
+      <div class="ef-icon">🔍</div>
+      <div class="ef-title" id="emptyFilterTitle">No photos match this filter</div>
+      <div class="ef-sub" id="emptyFilterSub">Face detection may still be running. Try again in a moment or switch to a different filter.</div>
+      <button class="ef-reset" onclick="setFilter('all')">Show All Photos</button>
+    </div>
+    <div class="bg-card" style="transform:scale(.87) translateY(22px);opacity:.3;"></div>
+    <div class="bg-card" style="transform:scale(.93) translateY(11px);opacity:.6;"></div>
+    <div id="mainCard">
+      <img id="cardImg" src="" alt=""/>
+      <div class="sov keep" id="keepOv"><span class="slbl">KEEP</span></div>
+      <div class="sov skip" id="skipOv"><span class="slbl">SKIP</span></div>
+      <div class="sov org"  id="orgOv" ><span class="slbl">FOLDER</span></div>
+      <div id="qualityBadge" class="q-badge"></div>
+      <div id="sceneBadge" class="scene-badge"></div>
+      <div class="card-bottom"><div class="cn" id="cName"></div><div class="cm" id="cMeta"></div></div>
+    </div>
+    <div id="dupPanel">
+      <div id="dupHead"></div>
+      <div id="dupGrid"></div>
+      <div id="dupActions">
+        <button class="da skip" id="dupSkipAll">Skip All</button>
+        <button class="da keep" id="dupKeepBtn">Keep Selected</button>
+      </div>
+    </div>
+  </div>
+  <div id="actions">
+    <button class="act a-done" id="doneBtn">
+      <div class="ring"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg></div>
+      <span>Done</span>
+    </button>
+    <button class="act a-skip" id="skipBtn">
+      <div class="ring"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+      <span>Skip</span>
+    </button>
+    <button class="act a-keep" id="keepBtn">
+      <div class="ring"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
+      <span>Keep</span>
+    </button>
+    <button class="act a-org" id="orgBtn">
+      <div class="ring"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div>
+      <span>Folder</span>
+    </button>
+    <button class="act a-bulk" id="bulkBtn">
+      <div class="ring"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg></div>
+      <span>AI</span>
+    </button>
+  </div>
+</div>
+
+<!-- ORGANIZE SHEET -->
+<div id="s-org">
+  <div class="org-sheet">
+    <div class="handle"></div>
+    <h3>Move to Folder</h3>
+    <p>Type a name or pick a suggestion — folder is created inside your photo directory.</p>
+    <input type="text" id="orgInput" placeholder="Folder name…"/>
+    <div class="chips" id="orgChips"></div>
+    <div class="org-actions">
+      <button class="btn-ghost" id="orgCancel">Cancel</button>
+      <button class="btn-blue"  id="orgConfirm">Create &amp; Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK AI SHEET -->
+<div id="bulkSheet">
+  <div class="bulk-inner">
+    <div class="handle"></div>
+    <h3>AI Bulk Actions</h3>
+    <button class="bulk-opt" id="bulkKeepGood">
+      <div class="bo-icon">⭐</div>
+      <div><div class="bo-name">Keep All Sharp Photos</div><div class="bo-sub" id="bulkGoodCount">Select all excellent + good quality</div></div>
+    </button>
+    <button class="bulk-opt" id="bulkSkipBlurry">
+      <div class="bo-icon">🔴</div>
+      <div><div class="bo-name">Skip All Blurry</div><div class="bo-sub" id="bulkBlurryCount">Remove poor quality from queue</div></div>
+    </button>
+    <button class="bulk-opt" id="bulkKeepVisible">
+      <div class="bo-icon">✅</div>
+      <div><div class="bo-name">Keep All Visible</div><div class="bo-sub" id="bulkVisibleCount">Keep everything in current filter</div></div>
+    </button>
+    <button class="bulk-opt" id="bulkSkipAll">
+      <div class="bo-icon">⏭</div>
+      <div><div class="bo-name">Skip Remaining</div><div class="bo-sub">Skip all unreviewed photos</div></div>
+    </button>
+    <button class="btn-ghost" id="bulkCancel" style="margin-top:4px">Cancel</button>
+  </div>
+</div>
+
+<!-- RECOVERY -->
+<div class="screen" id="s-recovery">
+  <div class="rec-head"><h2>Recovery Center</h2><button class="purge" id="purgeBtn">Purge All</button></div>
+  <div id="recList"></div>
+</div>
+
+<!-- DONE -->
+<div class="screen" id="s-done">
+  <div class="done-inner">
+    <div style="font-size:2.5rem">🎉</div>
+    <div class="done-big" id="doneKept">0</div>
+    <h2>Photos Selected</h2>
+    <div class="done-stats" id="doneStats"></div>
+    <div class="done-acts">
+      <div class="folder-save-row">
+        <input type="text" id="saveFolderInput" placeholder="Folder name…" value="Best Photos" />
+        <button class="btn-full" id="saveDoneBtn">Save →</button>
+      </div>
+      <div id="saveStatus"></div>
+      <button class="btn-ghost" id="keepGoingBtn">Keep Swiping</button>
+    </div>
+    <div id="aiInsights" class="ai-insights"></div>
+  </div>
+</div>
+
+<!-- PEOPLE -->
+<div class="screen" id="s-people">
+  <div class="people-head">
+    <h1>People</h1>
+    <span class="people-status" id="peopleStatus"></span>
+  </div>
+  <div id="peopleContent"></div>
+</div>
+
+<!-- PERSON PHOTOS -->
+<div class="screen" id="s-person-photos">
+  <div class="person-photos-head">
+    <button id="personBackBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15,18 9,12 15,6"/></svg>
+      People
+    </button>
+    <div class="person-photos-title">
+      <h2 id="personPhotoName"></h2>
+      <p id="personPhotoSub"></p>
+    </div>
+    <span id="personSelCount"></span>
+  </div>
+  <div id="personPhotosGrid"></div>
+  <div class="person-photos-actions">
+    <button id="personAddBtn">Add to Selection</button>
+    <button id="personSwipeBtn">Swipe →</button>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox">
+  <button id="lbClose">✕</button>
+  <img id="lbImg" src="" alt=""/>
+  <div id="lbName"></div>
+  <div id="lbHint">Tap anywhere to close</div>
+</div>
+
+<div id="recFb"><div class="rf-n" id="rfN"></div><div class="rf-t" id="rfT"></div></div>
+<div id="toast"></div>
+
+<script>
+// ── CORE STATE ────────────────────────────
+let dirHandle = null, allFiles = [], queue = [], totalItems = 0;
+let selected = new Set(), skippedSize = 0, keptSize = 0, totalSize = 0;
+let sessionKept = 0, sessionSkipped = 0, dupGroups = [];
+let cardUrl = null, dupChosen = new Set();
+const SUGGESTIONS = ['Favorites','Best Shots','Portraits','Ceremony','Reception','Family','Candids','Edited'];
+const TRASH = '.swipeclean_trash';
+
+// ── AI STATE ─────────────────────────────
+let meta = [];              // per-photo: {blur,brightness,quality,faceCount,scene,personId}
+let personGroups = [];      // [{id,label,photoIndices}]
+let faceModelsReady = false;
+let recognitionReady = false;
+let activeFilter = 'all';
+let filteredQueue = [];
+let filteredIdx = 0;
+let extraDirHandles = [];   // additional folders for multi-import
+
+const MODEL_URL = './models';
+
+// ── LOAD face-api.js ─────────────────────
+(function() {
+  const s = document.createElement('script');
+  s.src = './face-api.min.js';
+  s.onload = async () => {
+    try {
+      // Load all 3 models in parallel — all are local so total ~2s
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      ]);
+      faceModelsReady = true;
+      recognitionReady = true;
+      // If a scan already finished while models were loading, run detection now
+      if (allFiles.length && meta.filter(m => m?.scene === 'unknown' || m?.scene === undefined).length > 0) {
+        runFacePassBackground();
+      }
+    } catch(e) { console.warn('Face model load failed:', e); }
+  };
+  document.head.appendChild(s);
+})();
+
+// ── SCREENS ───────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function navActive(id) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const b = document.querySelector(`[data-screen="${id}"]`);
+  if (b) b.classList.add('active');
+}
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const s = btn.dataset.screen;
+    if ((s === 's-swipe' || s === 's-people') && !dirHandle) { toast('Open a folder first.'); return; }
+    if (s === 's-recovery') renderRecovery();
+    if (s === 's-people') buildPeopleScreen();
+    navActive(s); show(s);
+  });
+});
+
+// ── CONNECT ───────────────────────────────
+document.getElementById('openBtn').addEventListener('click', async () => {
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    extraDirHandles = [];
+    document.getElementById('addFolderBtn').classList.add('show');
+    document.getElementById('extraDirsInfo').classList.remove('show');
+    await runScan();
+  } catch(e) { if (e.name !== 'AbortError') toast('Could not open folder.'); }
+});
+
+document.getElementById('addFolderBtn').addEventListener('click', async () => {
+  if (!dirHandle) { toast('Open a primary folder first.'); return; }
+  try {
+    const extra = await window.showDirectoryPicker({ mode: 'read' });
+    extraDirHandles.push(extra);
+    const el = document.getElementById('extraDirsInfo');
+    el.textContent = `${extraDirHandles.length} extra folder${extraDirHandles.length > 1 ? 's' : ''} added — rescan to include`;
+    el.classList.add('show');
+    await runScan();
+  } catch(e) { if (e.name !== 'AbortError') toast('Could not open folder.'); }
+});
+
+document.getElementById('rescanBtn').addEventListener('click', () => { if (dirHandle) runScan(); });
+
+// ── SCAN ──────────────────────────────────
+async function runScan() {
+  show('s-scan'); document.getElementById('nav').classList.remove('show');
+  document.getElementById('faceMsg').textContent = '';
+  allFiles = []; totalSize = 0; meta = [];
+
+  // Collect files from primary + extra dirs
+  const dirs = [dirHandle, ...extraDirHandles];
+  for (const dh of dirs) {
+    for await (const e of dh.values())
+      if (e.kind === 'file' && /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(e.name)) allFiles.push(e);
+  }
+
+  if (!allFiles.length) { show('s-connect'); toast('No images found.'); return; }
+
+  const CIRC = 2 * Math.PI * 58.3;
+  const fill = document.getElementById('scanRingFill');
+  const pctEl = document.getElementById('scanPct');
+  const msgEl = document.getElementById('scanMsg');
+  const BATCH = 12;
+  const hashes = new Array(allFiles.length).fill(null);
+  const sizes  = new Array(allFiles.length).fill(0);
+  meta = new Array(allFiles.length).fill(null);
+
+  for (let i = 0; i < allFiles.length; i += BATCH) {
+    const end = Math.min(i + BATCH, allFiles.length);
+    await Promise.all(allFiles.slice(i, end).map(async (fh, j) => {
+      try {
+        const f = await fh.getFile(); sizes[i+j] = f.size; totalSize += f.size;
+        const [hash, blurData] = await Promise.all([pHash(f), detectBlur(f)]);
+        hashes[i+j] = hash;
+        meta[i+j] = {
+          blur: blurData.blur,
+          brightness: blurData.brightness,
+          quality: classifyQuality(blurData.blur, blurData.brightness),
+          faceCount: 0,
+          scene: 'unknown',
+          personId: -1
+        };
+      } catch {}
+    }));
+    const p = end / allFiles.length;
+    fill.style.strokeDashoffset = CIRC * (1 - p);
+    pctEl.textContent = Math.round(p * 100) + '%';
+    msgEl.textContent = `${end} of ${allFiles.length} photos…`;
+    await raf();
+  }
+
+  msgEl.textContent = 'Grouping duplicates…'; await raf();
+  const groups = groupHash(hashes);
+  dupGroups = groups.filter(g => g.length > 1);
+  document.getElementById('dupMsg').textContent = dupGroups.length
+    ? `${dupGroups.length} duplicate group${dupGroups.length > 1 ? 's' : ''} found`
+    : 'No duplicates found';
+
+  buildQueue(groups);
+  calibrateQuality();   // set adaptive thresholds from actual blur distribution
+  applyFilter();
+  updateFilterCounts();
+  buildDash(sizes, dupGroups);
+  document.getElementById('nav').classList.add('show');
+  navActive('s-dashboard'); show('s-dashboard');
+  setTimeout(() => animRing(sizes, dupGroups), 200);
+  buildSmartCollections();
+
+  // Face detection runs in background — doesn't block dashboard
+  runFacePassBackground();
+}
+
+// ── BLUR DETECTION ────────────────────────
+async function detectBlur(file) {
+  try {
+    const bm = await createImageBitmap(file, { resizeWidth: 80, resizeHeight: 80, resizeQuality: 'low' });
+    const cv = new OffscreenCanvas(80, 80);
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(bm, 0, 0, 80, 80); bm.close();
+    const { data } = ctx.getImageData(0, 0, 80, 80);
+    const W = 80;
+    const gray = new Float32Array(W * W);
+    let totalBrightness = 0;
+    for (let i = 0; i < W * W; i++) {
+      gray[i] = 0.299 * data[i*4] + 0.587 * data[i*4+1] + 0.114 * data[i*4+2];
+      totalBrightness += gray[i];
+    }
+    const brightness = totalBrightness / (W * W);
+    let sum = 0, sum2 = 0, n = 0;
+    for (let y = 1; y < W - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const lap = -4*gray[y*W+x] + gray[(y-1)*W+x] + gray[(y+1)*W+x] + gray[y*W+x-1] + gray[y*W+x+1];
+        sum += lap; sum2 += lap*lap; n++;
+      }
+    }
+    const mean = sum / n;
+    const variance = sum2 / n - mean * mean;
+    return { blur: variance, brightness };
+  } catch { return { blur: 100, brightness: 128 }; }
+}
+
+let qThresh = null; // set after scan based on actual distribution
+
+function classifyQuality(blur, brightness) {
+  const badLight = brightness < 35 || brightness > 235;
+  if (!qThresh) {
+    // Pre-calibration fallback — everything is review until we know the distribution
+    return badLight ? 'poor' : 'review';
+  }
+  if (badLight)            return blur > qThresh.review ? 'review' : 'poor';
+  if (blur >= qThresh.good)   return 'excellent';
+  if (blur >= qThresh.review) return 'good';
+  if (blur >= qThresh.poor)   return 'review';
+  return 'poor';
+}
+
+function calibrateQuality() {
+  const scores = meta.map(m => m?.blur).filter(b => b != null && b >= 0).sort((a,b) => a-b);
+  if (scores.length < 4) return;
+  qThresh = {
+    poor:   scores[Math.floor(scores.length * 0.15)],  // bottom 15% = poor
+    review: scores[Math.floor(scores.length * 0.50)],  // median = review/good split
+    good:   scores[Math.floor(scores.length * 0.82)]   // top 18% = excellent
+  };
+  // Re-label every photo with the calibrated thresholds
+  meta.forEach(m => { if (m) m.quality = classifyQuality(m.blur, m.brightness); });
+}
+
+// ── FACE DETECTION (background) ──────────
+let facePassRunning = false;
+
+async function runFacePassBackground() {
+  if (facePassRunning) return;
+  facePassRunning = true;
+
+  // Wait up to 20s for ALL models (detector + landmarks + recognition)
+  for (let t = 0; t < 200 && (!faceModelsReady || !recognitionReady); t++) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  if (!faceModelsReady || !recognitionReady || typeof faceapi === 'undefined') {
+    facePassRunning = false; return;
+  }
+
+  const statusBar = document.getElementById('aiStatusBar');
+  const total = allFiles.length;
+
+  // Show live progress in People screen
+  function updateProgress(done) {
+    const pct = Math.round((done / total) * 100);
+    const peopleEl = document.getElementById('peopleContent');
+    if (peopleEl && personGroups.length === 0) {
+      peopleEl.innerHTML = `
+        <div class="people-loading">
+          <span class="ai-dot"></span>
+          <span>Scanning faces… ${done} / ${total}</span>
+          <div style="width:200px;height:4px;background:#1a1a1a;border-radius:4px;overflow:hidden;margin-top:8px">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#9B8ED8,#60A5FA);border-radius:4px;transition:width .4s"></div>
+          </div>
+        </div>`;
+    }
+    if (statusBar) statusBar.innerHTML = `<span class="ai-dot"></span> Scanning faces… ${done}/${total}`;
+  }
+
+  updateProgress(0);
+
+  // Process one at a time — descriptors need sequential canvas context
+  for (let i = 0; i < total; i++) {
+    await detectAndUpdateMeta(i);
+
+    if (i % 20 === 0) {
+      updateProgress(i + 1);
+      updateFilterCounts();
+      buildSmartCollections();
+      await raf();
+    }
+  }
+
+  // All photos processed — cluster into people
+  clusterFaces();
+  buildSmartCollections();
+  rebuildPersonFilters();
+  updateFilterCounts();
+
+  const facedCount = meta.filter(m => m && m.faceCount > 0).length;
+  if (statusBar) statusBar.innerHTML = `✦ AI found faces in ${facedCount} photos`;
+
+  // Rebuild people screen if user is on it
+  buildPeopleScreen();
+  facePassRunning = false;
+}
+
+async function detectAndUpdateMeta(idx) {
+  if (!meta[idx] || typeof faceapi === 'undefined') return;
+  try {
+    const file = await allFiles[idx].getFile();
+
+    // Resize to 320×320 canvas — avoids processing full-resolution 5000px photos
+    const bm = await createImageBitmap(file, { resizeWidth: 320, resizeHeight: 320, resizeQuality: 'medium' });
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 320;
+    canvas.getContext('2d').drawImage(bm, 0, 0, 320, 320);
+    bm.close();
+
+    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 });
+    // withFaceLandmarks(true) uses the tiny landmark model — critical, must pass true
+    const detections = await faceapi
+      .detectAllFaces(canvas, opts)
+      .withFaceLandmarks(true)
+      .withFaceDescriptors();
+
+    const fc = detections.length;
+    meta[idx].faceCount = fc;
+    meta[idx].scene = fc === 0 ? 'no-face' : fc === 1 ? 'individual' : fc === 2 ? 'couple' : 'group';
+    // Normalize bounding boxes to 0–1 range
+    meta[idx].descriptors = detections.map(d => Array.from(d.descriptor));
+    meta[idx].faceBoxes   = detections.map(d => ({
+      x: d.detection.box.x / 320, y: d.detection.box.y / 320,
+      w: d.detection.box.width / 320, h: d.detection.box.height / 320
+    }));
+  } catch(e) { /* skip unreadable photos silently */ }
+}
+
+// ── PERSON CLUSTERING ─────────────────────
+function clusterFaces() {
+  const all = [];
+  for (let i = 0; i < meta.length; i++) {
+    if (meta[i]?.descriptors?.length) {
+      for (const d of meta[i].descriptors) all.push({ photoIdx: i, d });
+    }
+  }
+  if (!all.length) return;
+
+  const THRESH = 0.55;
+  const clusters = [];
+  for (const item of all) {
+    let best = -1, bestDist = Infinity;
+    for (let c = 0; c < clusters.length; c++) {
+      const dist = euclidean(item.d, clusters[c].rep);
+      if (dist < THRESH && dist < bestDist) { best = c; bestDist = dist; }
+    }
+    if (best >= 0) { clusters[best].members.push(item); }
+    else { clusters.push({ rep: item.d, members: [item] }); }
+  }
+
+  clusters.sort((a, b) => b.members.length - a.members.length);
+  personGroups = clusters
+    .filter(c => c.members.length >= 3)
+    .slice(0, 8)
+    .map((c, idx) => {
+      const photoIndices = [...new Set(c.members.map(m => m.photoIdx))];
+      // Pick representative: prefer solo portrait with best sharpness
+      let repIdx = photoIndices[0];
+      let bestScore = -1;
+      for (const pi of photoIndices) {
+        const m = meta[pi]; if (!m) continue;
+        let score = (m.blur || 0) / 100;
+        if (m.faceCount === 1) score += 20;
+        if (m.quality === 'excellent') score += 10;
+        if (m.quality === 'good') score += 5;
+        if (score > bestScore) { bestScore = score; repIdx = pi; }
+      }
+        const repFaceBox = meta[repIdx]?.faceBoxes?.[0] || null;
+      return { id: idx, label: 'Person ' + String.fromCharCode(65 + idx), photoIndices, repPhotoIdx: repIdx, repFaceBox };
+    });
+
+  for (const pg of personGroups) {
+    for (const pi of pg.photoIndices) {
+      if (meta[pi]) meta[pi].personId = pg.id;
+    }
+  }
+
+  rebuildPersonFilters();
+  buildSmartCollections();
+  buildPeopleScreen();
+}
+
+function euclidean(a, b) {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) { const d = a[i]-b[i]; s += d*d; }
+  return Math.sqrt(s);
+}
+
+// ── SMART COLLECTIONS ────────────────────
+function buildSmartCollections() {
+  const el = document.getElementById('smartColl');
+  if (!el || !meta.length) return;
+
+  const individuals = meta.filter(m => m?.scene === 'individual').length;
+  const couples     = meta.filter(m => m?.scene === 'couple').length;
+  const groups      = meta.filter(m => m?.scene === 'group').length;
+  const excellent   = meta.filter(m => m?.quality === 'excellent').length;
+  const poor        = meta.filter(m => m?.quality === 'poor').length;
+
+  if (!individuals && !couples && !groups && !excellent) { el.innerHTML = ''; return; }
+
+  const chips = [];
+  if (excellent)   chips.push({ icon:'⭐', n: excellent, l: 'Sharp',      f: 'excellent'   });
+  if (poor)        chips.push({ icon:'🔴', n: poor,      l: 'Blurry',     f: 'blurry'      });
+  if (individuals) chips.push({ icon:'👤', n: individuals, l: 'Individual', f: 'individual'  });
+  if (couples)     chips.push({ icon:'👥', n: couples,    l: 'Couple',     f: 'couple'      });
+  if (groups)      chips.push({ icon:'👨‍👩‍👧', n: groups, l: 'Group',      f: 'group'       });
+  for (const pg of personGroups) {
+    chips.push({ icon:'🙂', n: pg.photoIndices.length, l: pg.label, f: `person-${pg.id}` });
+  }
+
+  el.innerHTML = `
+    <div class="sc-label"><span><span class="ai-dot"></span>Smart Collections</span></div>
+    <div class="sc-row">${chips.map(c => `
+      <div class="sc-chip" data-filter="${c.f}">
+        <div class="sci">${c.icon}</div>
+        <div class="scn">${c.n}</div>
+        <div class="scl">${c.l}</div>
+      </div>`).join('')}
+    </div>`;
+
+  el.querySelectorAll('.sc-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const f = chip.dataset.filter;
+      activeFilter = f;
+      applyFilter();
+      navActive('s-swipe'); show('s-swipe');
+      loadCard();
+    });
+  });
+}
+
+// ── PEOPLE SCREEN ────────────────────────
+async function buildPeopleScreen() {
+  const el = document.getElementById('peopleContent');
+  const st = document.getElementById('peopleStatus');
+  if (!el) return;
+
+  if (!personGroups.length) {
+    const faceCount = meta.filter(m => m?.faceCount > 0).length;
+    if (!faceModelsReady) {
+      el.innerHTML = `<div class="people-loading"><span class="ai-dot"></span><span>AI is loading — detecting people in your photos…</span></div>`;
+    } else if (!recognitionReady) {
+      el.innerHTML = `<div class="people-loading"><span class="ai-dot"></span><span>Loading face recognition model… (${faceCount} faces found so far)</span></div>`;
+    } else {
+      el.innerHTML = `<div class="people-loading"><span style="font-size:2rem">👤</span><span>No people detected yet. Scan a folder with portrait photos first.</span></div>`;
+    }
+    if (st) st.textContent = '';
+    return;
+  }
+
+  if (st) st.textContent = `${personGroups.length} people`;
+  el.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'people-grid';
+
+  for (const pg of personGroups) {
+    const card = document.createElement('div');
+    card.className = 'person-card';
+
+    // Build avatar
+    const wrap = document.createElement('div');
+    wrap.className = 'person-avatar-wrap';
+    const ring = document.createElement('div');
+    ring.className = 'person-avatar-ring';
+    const avatarUrl = await getFaceAvatar(pg.repPhotoIdx, pg.repFaceBox);
+    let avatarEl;
+    if (avatarUrl) {
+      avatarEl = document.createElement('img');
+      avatarEl.className = 'person-avatar';
+      avatarEl.src = avatarUrl;
+      avatarEl.alt = pg.label;
+    } else {
+      avatarEl = document.createElement('div');
+      avatarEl.className = 'person-avatar placeholder';
+      avatarEl.textContent = '🙂';
+    }
+    wrap.appendChild(avatarEl);
+    wrap.appendChild(ring);
+
+    const name = document.createElement('div');
+    name.className = 'person-name';
+    name.textContent = pg.label;
+
+    const count = document.createElement('div');
+    count.className = 'person-count';
+    count.textContent = `${pg.photoIndices.length} photos`;
+
+    card.appendChild(wrap);
+    card.appendChild(name);
+    card.appendChild(count);
+    card.addEventListener('click', () => showPersonPhotos(pg.id));
+    grid.appendChild(card);
+  }
+
+  el.appendChild(grid);
+}
+
+async function getFaceAvatar(photoIdx, faceBox) {
+  try {
+    const file = await allFiles[photoIdx].getFile();
+    const bm = await createImageBitmap(file);
+    const W = bm.width, H = bm.height;
+
+    let cx, cy, size;
+    if (faceBox) {
+      // Scale normalized box back to image space, add 50% padding
+      const pad = 0.55;
+      const fx = faceBox.x * W, fy = faceBox.y * H;
+      const fw = faceBox.w * W, fh = faceBox.h * H;
+      const px = Math.max(0, fx - fw * pad);
+      const py = Math.max(0, fy - fh * pad);
+      const pw = Math.min(W - px, fw * (1 + 2 * pad));
+      const ph = Math.min(H - py, fh * (1 + 2 * pad));
+      size = Math.min(pw, ph);
+      cx = px + (pw - size) / 2;
+      cy = py + (ph - size) / 2;
+    } else {
+      // Centre crop
+      size = Math.min(W, H);
+      cx = (W - size) / 2;
+      cy = (H - size) / 2;
+    }
+
+    const cv = new OffscreenCanvas(120, 120);
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(bm, cx, cy, size, size, 0, 0, 120, 120);
+    bm.close();
+    const blob = await cv.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+    return URL.createObjectURL(blob);
+  } catch { return null; }
+}
+
+// ── PERSON PHOTOS ────────────────────────
+let currentPersonId = -1;
+let personPhotoSelected = new Set(); // indices into allFiles
+
+async function showPersonPhotos(personId) {
+  const pg = personGroups.find(p => p.id === personId);
+  if (!pg) return;
+  currentPersonId = personId;
+  personPhotoSelected = new Set(pg.photoIndices); // all selected by default
+
+  document.getElementById('personPhotoName').textContent = pg.label;
+  document.getElementById('personPhotoSub').textContent = `${pg.photoIndices.length} photos`;
+
+  const grid = document.getElementById('personPhotosGrid');
+  grid.innerHTML = '';
+
+  for (const idx of pg.photoIndices) {
+    const fh = allFiles[idx];
+    const file = await fh.getFile();
+    const url = URL.createObjectURL(file);
+
+    const thumb = document.createElement('div');
+    thumb.className = 'pp-thumb selected';
+    thumb.dataset.idx = idx;
+    thumb.innerHTML = `<img src="${url}" alt="${fh.name}"/><div class="pp-check"></div>`;
+    thumb.addEventListener('click', () => {
+      const i = parseInt(thumb.dataset.idx);
+      if (personPhotoSelected.has(i)) {
+        personPhotoSelected.delete(i);
+        thumb.classList.remove('selected');
+      } else {
+        personPhotoSelected.add(i);
+        thumb.classList.add('selected');
+      }
+      updatePersonSelCount();
+    });
+    grid.appendChild(thumb);
+  }
+
+  updatePersonSelCount();
+  navActive('s-people');
+  show('s-person-photos');
+}
+
+function updatePersonSelCount() {
+  document.getElementById('personSelCount').textContent = `${personPhotoSelected.size} selected`;
+  document.getElementById('personAddBtn').textContent = `Add ${personPhotoSelected.size} to Selection`;
+}
+
+document.getElementById('personBackBtn').addEventListener('click', () => {
+  navActive('s-people'); show('s-people');
+});
+
+document.getElementById('personAddBtn').addEventListener('click', () => {
+  let added = 0;
+  for (const idx of personPhotoSelected) {
+    selected.add(allFiles[idx].name); added++;
+  }
+  toast(`✓ ${added} photos added to your selection`);
+  navActive('s-people'); show('s-people');
+});
+
+document.getElementById('personSwipeBtn').addEventListener('click', () => {
+  const pg = personGroups.find(p => p.id === currentPersonId);
+  if (!pg) return;
+  activeFilter = `person-${currentPersonId}`;
+  document.querySelectorAll('.filt').forEach(b => b.classList.toggle('active', b.dataset.f === activeFilter));
+  applyFilter(); filteredIdx = 0;
+  navActive('s-swipe'); show('s-swipe'); loadCard();
+});
+
+// ── FILTER BAR ────────────────────────────
+function rebuildPersonFilters() {
+  const bar = document.getElementById('filterBar');
+  // Remove old person filters
+  bar.querySelectorAll('.filt[data-f^="person-"]').forEach(b => b.remove());
+  for (const pg of personGroups) {
+    const btn = document.createElement('button');
+    btn.className = 'filt';
+    btn.dataset.f = `person-${pg.id}`;
+    btn.textContent = `🙂 ${pg.label}`;
+    bar.appendChild(btn);
+    btn.addEventListener('click', () => setFilter(pg.id !== undefined ? `person-${pg.id}` : 'all'));
+  }
+}
+
+document.getElementById('filterBar').addEventListener('click', e => {
+  const btn = e.target.closest('.filt');
+  if (!btn) return;
+  setFilter(btn.dataset.f);
+});
+
+function updateFilterCounts() {
+  if (!queue.length) return;
+  const counts = {
+    all:        queue.length,
+    excellent:  queue.filter(it => it.type==='single' && (meta[it.index]?.quality==='excellent' || meta[it.index]?.quality==='good')).length,
+    blurry:     queue.filter(it => it.type==='single' && meta[it.index]?.quality==='poor').length,
+    individual: queue.filter(it => it.type==='single' && meta[it.index]?.scene==='individual').length,
+    couple:     queue.filter(it => it.type==='single' && meta[it.index]?.scene==='couple').length,
+    group:      queue.filter(it => it.type==='single' && meta[it.index]?.scene==='group').length,
+  };
+  const labels = { all:'All', excellent:'⭐ Sharp', blurry:'🔴 Blurry', individual:'👤 Individual', couple:'👥 Couple', group:'👨‍👩‍👧 Group' };
+  document.querySelectorAll('.filt[data-f]').forEach(btn => {
+    const f = btn.dataset.f;
+    if (f && counts[f] !== undefined) {
+      btn.textContent = `${labels[f]} (${counts[f]})`;
+      btn.disabled = counts[f] === 0;
+      btn.style.opacity = counts[f] === 0 ? '0.35' : '';
+    }
+  });
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filt').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  applyFilter();
+  filteredIdx = 0;
+  loadCard();
+}
+
+function applyFilter() {
+  if (activeFilter === 'all') {
+    filteredQueue = queue.slice();
+  } else {
+    filteredQueue = queue.filter(item => {
+      if (item.type === 'dup') return true; // always include dup groups
+      const m = meta[item.index];
+      if (!m) return activeFilter === 'all';
+      switch (activeFilter) {
+        case 'excellent':   return m.quality === 'excellent' || m.quality === 'good';
+        case 'blurry':      return m.quality === 'poor';
+        case 'individual':  return m.scene === 'individual';
+        case 'couple':      return m.scene === 'couple';
+        case 'group':       return m.scene === 'group';
+        default:
+          if (activeFilter.startsWith('person-')) {
+            return m.personId === parseInt(activeFilter.split('-')[1]);
+          }
+          return true;
+      }
+    });
+  }
+  totalItems = filteredQueue.length;
+}
+
+// ── BULK ACTIONS ──────────────────────────
+document.getElementById('bulkBtn').addEventListener('click', () => {
+  const goodC    = meta.filter((m, i) => m && (m.quality==='excellent'||m.quality==='good') && filteredQueue.slice(filteredIdx).some(q => q.type==='single' && q.index===i)).length;
+  const blurryC  = meta.filter((m, i) => m && m.quality==='poor' && filteredQueue.slice(filteredIdx).some(q => q.type==='single' && q.index===i)).length;
+  const visibleC = filteredQueue.length - filteredIdx;
+  document.getElementById('bulkGoodCount').textContent    = `${goodC} sharp photos remaining`;
+  document.getElementById('bulkBlurryCount').textContent  = `${blurryC} blurry photos to remove`;
+  document.getElementById('bulkVisibleCount').textContent = `${visibleC} photos in current view`;
+  document.getElementById('bulkSheet').classList.add('show');
+});
+
+document.getElementById('bulkCancel').addEventListener('click', () => document.getElementById('bulkSheet').classList.remove('show'));
+document.getElementById('bulkSheet').addEventListener('click', e => { if (e.target === document.getElementById('bulkSheet')) document.getElementById('bulkSheet').classList.remove('show'); });
+
+document.getElementById('bulkKeepGood').addEventListener('click', () => {
+  document.getElementById('bulkSheet').classList.remove('show');
+  let kept = 0;
+  for (let i = filteredIdx; i < filteredQueue.length; i++) {
+    const item = filteredQueue[i];
+    if (item.type === 'single') {
+      const m = meta[item.index];
+      if (m && (m.quality === 'excellent' || m.quality === 'good')) {
+        selected.add(allFiles[item.index].name); kept++;
+      }
+    }
+  }
+  filteredIdx = filteredQueue.length;
+  sessionKept += kept;
+  toast(`⭐ ${kept} sharp photos added to selection`);
+  showDone();
+});
+
+document.getElementById('bulkSkipBlurry').addEventListener('click', () => {
+  document.getElementById('bulkSheet').classList.remove('show');
+  let removed = 0;
+  filteredQueue = filteredQueue.filter(item => {
+    if (item.type === 'single') {
+      const m = meta[item.index];
+      if (m && m.quality === 'poor') { removed++; return false; }
+    }
+    return true;
+  });
+  totalItems = filteredQueue.length;
+  toast(`🔴 ${removed} blurry photos removed from queue`);
+  if (filteredIdx >= filteredQueue.length) { showDone(); return; }
+  loadCard();
+});
+
+document.getElementById('bulkKeepVisible').addEventListener('click', () => {
+  document.getElementById('bulkSheet').classList.remove('show');
+  let kept = 0;
+  for (let i = filteredIdx; i < filteredQueue.length; i++) {
+    const item = filteredQueue[i];
+    if (item.type === 'single') { selected.add(allFiles[item.index].name); kept++; }
+  }
+  filteredIdx = filteredQueue.length;
+  sessionKept += kept;
+  toast(`✅ ${kept} photos added to selection`);
+  showDone();
+});
+
+document.getElementById('bulkSkipAll').addEventListener('click', () => {
+  document.getElementById('bulkSheet').classList.remove('show');
+  filteredIdx = filteredQueue.length;
+  showDone();
+});
+
+// ── DHASH ─────────────────────────────────
+async function pHash(file) {
+  const bm = await createImageBitmap(file, { resizeWidth:9, resizeHeight:8, resizeQuality:'low' });
+  const cv = new OffscreenCanvas(9, 8); const ctx = cv.getContext('2d');
+  ctx.drawImage(bm, 0, 0, 9, 8); bm.close();
+  const { data } = ctx.getImageData(0, 0, 9, 8);
+  const hash = [];
+  for (let y=0; y<8; y++) {
+    for (let x=0; x<8; x++) {
+      const i1=(y*9+x)*4, i2=(y*9+x+1)*4;
+      const g1=.299*data[i1]+.587*data[i1+1]+.114*data[i1+2];
+      const g2=.299*data[i2]+.587*data[i2+1]+.114*data[i2+2];
+      hash.push(g1 > g2 ? 1 : 0);
+    }
+  }
+  return hash;
+}
+function hamm(a,b) { if(!a||!b) return 64; let d=0; for(let i=0;i<64;i++) if(a[i]!==b[i]) d++; return d; }
+function groupHash(hashes) {
+  const n=hashes.length, p=Array.from({length:n},(_,i)=>i);
+  function find(x){while(p[x]!==x){p[x]=p[p[x]];x=p[x];}return x;}
+  function union(a,b){p[find(a)]=find(b);}
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) if(hamm(hashes[i],hashes[j])<=5) union(i,j);
+  const m=new Map();
+  for(let i=0;i<n;i++){const r=find(i);if(!m.has(r))m.set(r,[]);m.get(r).push(i);}
+  return [...m.values()];
+}
+
+// ── DASHBOARD ─────────────────────────────
+function buildDash(sizes, dups) {
+  const dupSz = dups.reduce((acc,g)=>{
+    const s=[...g].sort((a,b)=>sizes[b]-sizes[a]);
+    return acc+s.slice(1).reduce((t,i)=>t+sizes[i],0);
+  },0);
+  const dupCnt = dups.reduce((s,g)=>s+g.length-1,0);
+  const uniq = allFiles.length - dups.reduce((s,g)=>s+g.length,0);
+  document.getElementById('storageSub').textContent = `${allFiles.length} photos · ${dups.length} dup groups`;
+  document.getElementById('ringNum').textContent = fmtSz(dupSz);
+  document.getElementById('breakdown').innerHTML = `
+    <div class="bk"><div class="bi">📸</div><div class="bn">${allFiles.length}</div><div class="bl">Total Photos</div><div class="bs">${fmtSz(totalSize)}</div></div>
+    <div class="bk"><div class="bi">🔁</div><div class="bn">${dupCnt}</div><div class="bl">Duplicates</div><div class="bs">${fmtSz(dupSz)} free</div></div>
+    <div class="bk"><div class="bi">📂</div><div class="bn">${dups.length}</div><div class="bl">Dup Groups</div><div class="bs">&nbsp;</div></div>
+    <div class="bk"><div class="bi">✅</div><div class="bn">${uniq}</div><div class="bl">Unique</div><div class="bs">&nbsp;</div></div>
+  `;
+  const avg = totalSize / allFiles.length;
+  document.getElementById('insights').innerHTML = `
+    <div class="ins-card"><div class="ii">💡</div><div class="it">You have <strong>${dups.length} duplicate groups</strong> taking up <strong>${fmtSz(dupSz)}</strong> of extra space.</div></div>
+    <div class="ins-card"><div class="ii">📐</div><div class="it">Average photo size is <strong>${fmtSz(avg)}</strong>. Cleaning duplicates is the fastest way to recover storage.</div></div>
+  `;
+}
+function animRing(sizes, dups) {
+  const dupSz = dups.reduce((acc,g)=>{const s=[...g].sort((a,b)=>sizes[b]-sizes[a]);return acc+s.slice(1).reduce((t,i)=>t+sizes[i],0);},0);
+  const ratio = Math.min(dupSz/Math.max(totalSize,1),1);
+  const CIRC = 2*Math.PI*78;
+  document.getElementById('bigRingFill').style.strokeDashoffset = CIRC*(1-ratio);
+}
+
+// ── QUEUE ─────────────────────────────────
+function buildQueue(groups) {
+  queue = [];
+  groups.filter(g=>g.length>1).forEach(g=>queue.push({type:'dup',indices:g}));
+  groups.filter(g=>g.length===1).forEach(g=>queue.push({type:'single',index:g[0]}));
+}
+
+// ── START SWIPING ─────────────────────────
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (!queue.length) { toast('Nothing to swipe.'); return; }
+  filteredIdx=0; selected.clear(); skippedSize=0; keptSize=0; sessionKept=0; sessionSkipped=0;
+  activeFilter='all';
+  document.querySelectorAll('.filt').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
+  applyFilter();
+  navActive('s-swipe'); show('s-swipe'); loadCard();
+});
+
+// ── LOAD CARD ─────────────────────────────
+async function loadCard() {
+  if (filteredIdx >= filteredQueue.length) {
+    // Empty because filter returned nothing — show a helpful message instead of done screen
+    if (filteredQueue.length === 0 && activeFilter !== 'all') {
+      const faceFilters = ['individual','couple','group'];
+      const isFaceFilter = faceFilters.includes(activeFilter) || activeFilter.startsWith('person-');
+      const filterNames = { excellent:'Sharp Photos', blurry:'Blurry Photos', individual:'Individual Portraits', couple:'Couple Shots', group:'Group Photos' };
+      const name = filterNames[activeFilter] || activeFilter;
+      document.getElementById('emptyFilterTitle').textContent = `No ${name} found yet`;
+      document.getElementById('emptyFilterSub').textContent = isFaceFilter
+        ? 'Face detection is still running in the background. Wait a moment and try this filter again, or tap "Show All Photos".'
+        : 'No photos matched this filter in your folder. Try a different filter or tap "Show All Photos".';
+      document.getElementById('emptyFilter').classList.add('show');
+      document.getElementById('mainCard').style.display = 'none';
+      document.getElementById('dupPanel').classList.remove('show');
+      return;
+    }
+    showDone(); return;
+  }
+  document.getElementById('emptyFilter').classList.remove('show');
+  document.getElementById('mainCard').style.display = '';
+  updateStats();
+  const item = filteredQueue[filteredIdx];
+  if (item.type==='dup') await loadDup(item); else await loadSingle(item);
+}
+
+async function loadSingle(item) {
+  document.getElementById('dupPanel').classList.remove('show');
+  document.getElementById('dupBanner').classList.remove('show');
+  document.getElementById('mainCard').style.display='';
+  resetCard();
+  const fh=allFiles[item.index], file=await fh.getFile();
+  if(cardUrl) URL.revokeObjectURL(cardUrl);
+  cardUrl=URL.createObjectURL(file);
+  document.getElementById('cardImg').src=cardUrl;
+  document.getElementById('cName').textContent=fh.name;
+
+  // Quality badge
+  const m = meta[item.index];
+  const qb = document.getElementById('qualityBadge');
+  const sb = document.getElementById('sceneBadge');
+  if (m) {
+    const qlabels = { excellent:'⭐ Sharp', good:'✓ Good', review:'~ Review', poor:'⚠ Blurry' };
+    qb.className = `q-badge ${m.quality}`;
+    qb.textContent = qlabels[m.quality] || '';
+    const slabels = { individual:'👤', couple:'👥', group:'👨‍👩‍👧' };
+    if (slabels[m.scene]) {
+      sb.textContent = slabels[m.scene];
+      sb.classList.add('show');
+    } else {
+      sb.classList.remove('show');
+    }
+    const personPart = m.personId >= 0 && personGroups[m.personId] ? ` · ${personGroups[m.personId].label}` : '';
+    document.getElementById('cMeta').textContent = fmtSz(file.size) + personPart;
+  } else {
+    qb.className = 'q-badge';
+    sb.classList.remove('show');
+    document.getElementById('cMeta').textContent = fmtSz(file.size);
+  }
+  preloadNext();
+}
+
+async function loadDup(item) {
+  document.getElementById('mainCard').style.display='none';
+  document.getElementById('dupBanner').classList.add('show');
+  document.getElementById('dupBannerText').textContent=`${item.indices.length} similar photos — pick which to keep`;
+  document.getElementById('dupPanel').classList.add('show');
+  document.getElementById('dupHead').innerHTML=`<span>Duplicate Group · ${item.indices.length} photos</span><span class="zoom-hint">⤢ to view full size</span>`;
+  const grid=document.getElementById('dupGrid');
+  const n=item.indices.length;
+  grid.style.gridTemplateColumns = n <= 4 ? `repeat(2, 1fr)` : `1fr`;
+  grid.innerHTML=''; dupChosen.clear();
+  for(const idx of item.indices){
+    const fh=allFiles[idx], file=await fh.getFile(), url=URL.createObjectURL(file);
+    const m = meta[idx];
+    const qLabel = m ? ({excellent:'⭐',good:'✓',review:'~',poor:'⚠'}[m.quality]||'') : '';
+    const el=document.createElement('div'); el.className='dt'; el.dataset.idx=idx;
+    el.innerHTML=`<img src="${url}" alt="${fh.name}"/><button class="zoom-btn" title="View full size">⤢</button><div class="dc"><svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2.5"><polyline points="1.5,6 4.5,9 10.5,3"/></svg></div><div class="dn">${qLabel} ${fh.name}</div>`;
+    el.querySelector('.zoom-btn').addEventListener('click', e => { e.stopPropagation(); openLightbox(url, fh.name); });
+    el.addEventListener('click',()=>{el.classList.toggle('on');if(el.classList.contains('on'))dupChosen.add(idx);else dupChosen.delete(idx);updDupBtn();});
+    grid.appendChild(el);
+  }
+  const first=grid.firstElementChild; first.classList.add('on'); dupChosen.add(parseInt(first.dataset.idx)); updDupBtn();
+}
+function updDupBtn(){document.getElementById('dupKeepBtn').textContent=dupChosen.size?`Keep ${dupChosen.size}`:'Keep Selected';}
+document.getElementById('dupKeepBtn').addEventListener('click',()=>{dupChosen.forEach(i=>selected.add(allFiles[i].name));advance();});
+document.getElementById('dupSkipAll').addEventListener('click',advance);
+
+// ── GESTURE ───────────────────────────────
+const mc=document.getElementById('mainCard');
+let sx=0,sy=0,dx=0,dy=0,drag=false;
+mc.addEventListener('pointerdown',e=>{if(filteredQueue[filteredIdx]?.type!=='single')return;drag=true;sx=e.clientX;sy=e.clientY;dx=0;dy=0;mc.style.transition='none';mc.setPointerCapture(e.pointerId);});
+mc.addEventListener('pointermove',e=>{if(!drag)return;dx=e.clientX-sx;dy=e.clientY-sy;mc.style.transform=`translateX(${dx}px) translateY(${Math.max(dy,-120)}px) rotate(${dx*.06}deg)`;const rH=Math.min(Math.abs(dx)/90,1),rV=Math.min(Math.max(-dy/100,0),1);document.getElementById('keepOv').style.opacity=dx>20?rH*.85:0;document.getElementById('skipOv').style.opacity=dx<-20?rH*.85:0;document.getElementById('orgOv').style.opacity=dy<-40?rV*.85:0;});
+mc.addEventListener('pointerup',()=>{if(!drag)return;drag=false;if(dy<=-100&&Math.abs(dx)<80)openOrg();else if(dx>=90)keepCard();else if(dx<=-90)skipCard();else resetCard();});
+
+function resetCard(){mc.style.transition='transform .35s cubic-bezier(.34,1.56,.64,1)';mc.style.transform='none';['keepOv','skipOv','orgOv'].forEach(id=>document.getElementById(id).style.opacity=0);}
+function flyCard(dir){const x=dir==='right'?window.innerWidth+280:-(window.innerWidth+280);mc.style.transition='transform .3s cubic-bezier(.4,0,.2,1)';mc.style.transform=`translateX(${x}px) rotate(${dir==='right'?18:-18}deg)`;}
+function flyUp(){mc.style.transition='transform .28s ease-in';mc.style.transform=`translateY(-${window.innerHeight}px) rotate(-5deg)`;}
+
+document.getElementById('keepBtn').addEventListener('click',keepCard);
+document.getElementById('skipBtn').addEventListener('click',skipCard);
+document.getElementById('orgBtn').addEventListener('click',openOrg);
+document.getElementById('doneBtn').addEventListener('click',showDone);
+
+function keepCard(){const item=filteredQueue[filteredIdx];if(item?.type!=='single')return;selected.add(allFiles[item.index].name);sessionKept++;flyCard('right');setTimeout(advance,280);}
+function skipCard(){const item=filteredQueue[filteredIdx];if(item?.type!=='single')return;sessionSkipped++;allFiles[item.index].getFile().then(f=>{skippedSize+=f.size;showFb(f.size);});flyCard('left');setTimeout(advance,280);}
+function advance(){filteredIdx++;loadCard();}
+
+async function preloadNext(){const n=filteredQueue[filteredIdx+1];if(!n||n.type!=='single')return;try{const f=await allFiles[n.index].getFile();const u=URL.createObjectURL(f);const img=new Image();img.src=u;setTimeout(()=>URL.revokeObjectURL(u),6000);}catch{}}
+
+function updateStats(){
+  const total = filteredQueue.length;
+  const label = activeFilter !== 'all' ? ` (filtered)` : '';
+  document.getElementById('progressText').textContent=`${filteredIdx+1}/${total}${label}`;
+  document.getElementById('selCount').textContent=`${selected.size} kept`;
+  document.getElementById('swipeBarFill').style.width=`${(filteredIdx/Math.max(total,1))*100}%`;
+}
+
+// ── ORGANIZE ──────────────────────────────
+function openOrg(){document.getElementById('orgInput').value='';buildChips();document.getElementById('s-org').classList.add('show');document.getElementById('orgInput').focus();}
+function buildChips(){const c=document.getElementById('orgChips');c.innerHTML='';SUGGESTIONS.forEach(s=>{const el=document.createElement('div');el.className='chip';el.textContent=s;el.addEventListener('click',()=>document.getElementById('orgInput').value=s);c.appendChild(el);});}
+document.getElementById('orgCancel').addEventListener('click',()=>document.getElementById('s-org').classList.remove('show'));
+document.getElementById('orgConfirm').addEventListener('click',async()=>{
+  const name=document.getElementById('orgInput').value.trim();if(!name)return;
+  document.getElementById('s-org').classList.remove('show');
+  const item=filteredQueue[filteredIdx];if(item?.type!=='single')return;
+  flyUp();
+  await moveToFolder(allFiles[item.index].name,name);
+  selected.delete(allFiles[item.index].name);
+  setTimeout(advance,260);
+});
+document.getElementById('orgInput').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('orgConfirm').click();if(e.key==='Escape')document.getElementById('orgCancel').click();});
+
+async function moveToFolder(fname,folder){
+  try{
+    const sub=await dirHandle.getDirectoryHandle(folder,{create:true});
+    const fh=allFiles.find(f=>f.name===fname); if(!fh) return;
+    const file=await fh.getFile();
+    const nfh=await sub.getFileHandle(fname,{create:true});const w=await nfh.createWritable();
+    await w.write(file);await w.close();await dirHandle.removeEntry(fname);
+    toast(`📁 Moved to "${folder}"`);
+  }catch(e){console.warn(e);}
+}
+
+// ── FEEDBACK ──────────────────────────────
+let fbTimer;
+function showFb(bytes){
+  const fb=document.getElementById('recFb');
+  document.getElementById('rfN').textContent=`+${fmtSz(bytes)} recovered`;
+  document.getElementById('rfT').textContent=`Session: ${fmtSz(skippedSize)}`;
+  fb.classList.add('show');clearTimeout(fbTimer);
+  fbTimer=setTimeout(()=>fb.classList.remove('show'),1400);
+}
+
+document.getElementById('selBadge').addEventListener('click',()=>toast(`${selected.size} photos selected`));
+
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('s-swipe').classList.contains('active'))return;
+  if(e.key==='ArrowRight')keepCard();if(e.key==='ArrowLeft')skipCard();if(e.key==='ArrowUp')openOrg();
+});
+
+// ── DONE ──────────────────────────────────
+function showDone(){
+  document.getElementById('doneKept').textContent=selected.size;
+  document.getElementById('doneStats').innerHTML=`
+    <div class="ds"><div class="dn">${sessionSkipped}</div><div class="dl">Skipped</div></div>
+    <div class="ds"><div class="dn">${fmtSz(skippedSize)}</div><div class="dl">To Recover</div></div>
+    <div class="ds"><div class="dn">${sessionKept}</div><div class="dl">Kept</div></div>
+  `;
+  show('s-done');if(selected.size>0)confetti();
+  buildMemoryInsights();
+}
+
+function buildMemoryInsights() {
+  const el = document.getElementById('aiInsights');
+  if (!el || !selected.size) { if(el) el.innerHTML=''; return; }
+
+  const selectedIndices = allFiles
+    .map((fh, i) => selected.has(fh.name) ? i : -1)
+    .filter(i => i >= 0);
+
+  const insights = [];
+
+  // Quality breakdown
+  const excellent = selectedIndices.filter(i => meta[i]?.quality === 'excellent').length;
+  const poor      = selectedIndices.filter(i => meta[i]?.quality === 'poor').length;
+  if (excellent > 0) {
+    insights.push({ icon:'⭐', text: `<strong>${excellent} sharp photos</strong> in your selection — great eye for quality.` });
+  }
+  if (poor > 0) {
+    insights.push({ icon:'⚠️', text: `<strong>${poor} blurry photos</strong> made it in. You might want to review them.` });
+  }
+
+  // Scene breakdown
+  const indivCount  = selectedIndices.filter(i => meta[i]?.scene === 'individual').length;
+  const coupleCount = selectedIndices.filter(i => meta[i]?.scene === 'couple').length;
+  const groupCount  = selectedIndices.filter(i => meta[i]?.scene === 'group').length;
+  if (indivCount || coupleCount || groupCount) {
+    const parts = [];
+    if (indivCount)  parts.push(`${indivCount} portraits`);
+    if (coupleCount) parts.push(`${coupleCount} couple shots`);
+    if (groupCount)  parts.push(`${groupCount} group photos`);
+    insights.push({ icon:'📸', text: `Your selection has <strong>${parts.join(', ')}</strong>.` });
+  }
+
+  // Person appearances
+  for (const pg of personGroups) {
+    const count = selectedIndices.filter(i => meta[i]?.personId === pg.id).length;
+    if (count >= 3) {
+      insights.push({ icon:'🙂', text: `<strong>${pg.label}</strong> appears in <strong>${count} of your selected photos</strong>.` });
+    }
+  }
+
+  // Duplicates kept
+  const dupKept = selectedIndices.length - new Set(selectedIndices).size;
+
+  if (!insights.length) { el.innerHTML=''; return; }
+
+  el.innerHTML = `
+    <div class="ai-insights-title">✦ AI Memory</div>
+    ${insights.slice(0,4).map(i => `
+      <div class="ai-card">
+        <div class="aii">${i.icon}</div>
+        <div class="ait">${i.text}</div>
+      </div>`).join('')}
+  `;
+}
+
+document.getElementById('keepGoingBtn').addEventListener('click',()=>{navActive('s-swipe');show('s-swipe');loadCard();});
+document.getElementById('saveDoneBtn').addEventListener('click', async () => {
+  const status = document.getElementById('saveStatus');
+  if (!dirHandle) {
+    status.textContent = '⚠ No folder open — go back to Home and open your folder again.';
+    status.style.color = '#F87171'; return;
+  }
+  if (!selected.size) {
+    status.textContent = '⚠ No photos selected — swipe right to keep photos first.';
+    status.style.color = '#F87171'; return;
+  }
+  const name = document.getElementById('saveFolderInput').value.trim();
+  if (!name) { document.getElementById('saveFolderInput').focus(); return; }
+  await saveSelected(name);
+});
+document.getElementById('saveFolderInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('saveDoneBtn').click();
+});
+
+async function saveSelected(folderName) {
+  const btn    = document.getElementById('saveDoneBtn');
+  const status = document.getElementById('saveStatus');
+  btn.disabled = true; btn.textContent = 'Checking access…';
+  status.style.color = '#666'; status.textContent = '';
+
+  try {
+    const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      status.textContent = '⚠ Permission denied — click "Allow" in the browser bar.';
+      status.style.color = '#F87171';
+      btn.disabled = false; btn.textContent = 'Save →'; return;
+    }
+  } catch(e) {
+    status.textContent = '⚠ Could not request permission. Reopen your folder from Home.';
+    status.style.color = '#F87171';
+    btn.disabled = false; btn.textContent = 'Save →'; return;
+  }
+
+  btn.textContent = 'Saving…';
+  let sub;
+  try {
+    sub = await dirHandle.getDirectoryHandle(folderName, { create: true });
+  } catch(e) {
+    status.textContent = `⚠ Could not create folder: ${e.message}`;
+    status.style.color = '#F87171';
+    btn.disabled = false; btn.textContent = 'Save →'; return;
+  }
+
+  let copied = 0, failed = 0;
+  const names = [...selected];
+  for (const fname of names) {
+    try {
+      // Use the stored fileHandle directly — works across multiple source folders
+      const fileHdl = allFiles.find(f => f.name === fname);
+      if (!fileHdl) { failed++; continue; }
+      const file = await fileHdl.getFile();
+      const nfh  = await sub.getFileHandle(fname, { create: true });
+      const w    = await nfh.createWritable();
+      await w.write(file); await w.close();
+      copied++;
+      status.textContent = `Copying ${copied} of ${names.length}…`;
+      status.style.color = '#666';
+    } catch(e) { console.error('Failed to copy', fname, e); failed++; }
+  }
+
+  btn.disabled = false; btn.textContent = 'Save →';
+  if (copied === 0) {
+    status.textContent = `⚠ Could not copy any files. Reopen folder and try again.`;
+    status.style.color = '#F87171'; return;
+  }
+  status.textContent = failed > 0 ? `${copied} copied, ${failed} failed.` : '';
+  status.style.color = '#666';
+  selected.clear();
+  toast(`✓ ${copied} photos copied to "${folderName}"`);
+  navActive('s-dashboard'); show('s-dashboard'); await runScan();
+}
+
+// ── RECOVERY ──────────────────────────────
+function renderRecovery(){
+  const list=document.getElementById('recList');list.innerHTML='';
+  if(!dirHandle){list.innerHTML='<div class="rec-empty">Open a folder first.</div>';return;}
+  (async()=>{
+    let trashDir;
+    try{trashDir=await dirHandle.getDirectoryHandle(TRASH);}
+    catch{list.innerHTML='<div class="rec-empty">No deleted files. Skipped photos won\'t appear here — use the folder button to move files if you want to recover them later.</div>';return;}
+    const items=[];for await(const e of trashDir.values())if(e.kind==='file')items.push(e);
+    if(!items.length){list.innerHTML='<div class="rec-empty">Trash is empty.</div>';return;}
+    list.innerHTML=`<div class="rec-sec">Deleted Files (${items.length})</div>`;
+    for(const fh of items){
+      const file=await fh.getFile();const url=URL.createObjectURL(file);
+      const row=document.createElement('div');row.className='rec-row';
+      row.innerHTML=`<img class="rec-thumb" src="${url}" alt="${fh.name}"/><div class="rec-info"><div class="rec-name">${fh.name}</div><div class="rec-sz">${fmtSz(file.size)}</div></div><button class="rec-restore">Restore</button>`;
+      row.querySelector('.rec-restore').addEventListener('click',()=>restore(fh.name,row));
+      list.appendChild(row);
+    }
+  })();
+}
+
+async function restore(name,row){
+  try{
+    const td=await dirHandle.getDirectoryHandle(TRASH);
+    const fh=await td.getFileHandle(name);const file=await fh.getFile();
+    const nfh=await dirHandle.getFileHandle(name,{create:true});const w=await nfh.createWritable();
+    await w.write(file);await w.close();await td.removeEntry(name);
+    row.remove();toast(`✓ ${name} restored`);
+  }catch{toast('Could not restore.');}
+}
+
+document.getElementById('purgeBtn').addEventListener('click',async()=>{
+  if(!confirm('Permanently delete all trashed files?'))return;
+  try{
+    const td=await dirHandle.getDirectoryHandle(TRASH);
+    const ns=[];for await(const e of td.values())if(e.kind==='file')ns.push(e.name);
+    for(const n of ns)await td.removeEntry(n);
+    toast('Trash emptied');renderRecovery();
+  }catch{toast('Nothing to purge.');}
+});
+
+// ── CONFETTI ──────────────────────────────
+function confetti(){
+  const cv=document.getElementById('confetti-cv');cv.style.display='block';
+  cv.width=window.innerWidth;cv.height=window.innerHeight;
+  const ctx=cv.getContext('2d');
+  const COLS=['#4ADE80','#60A5FA','#FBBF24','#F87171','#A78BFA','#fff'];
+  const ps=Array.from({length:120},()=>({x:Math.random()*cv.width,y:-10,vx:(Math.random()-.5)*4,vy:Math.random()*4+2,r:Math.random()*6+3,c:COLS[Math.floor(Math.random()*COLS.length)],rot:Math.random()*360,rs:(Math.random()-.5)*8}));
+  let f=0;
+  function draw(){ctx.clearRect(0,0,cv.width,cv.height);for(const p of ps){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.c;ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r);ctx.restore();p.x+=p.vx;p.y+=p.vy;p.vy+=.08;p.rot+=p.rs;}f++;if(f<130)requestAnimationFrame(draw);else{ctx.clearRect(0,0,cv.width,cv.height);cv.style.display='none';}}
+  draw();
+}
+
+// ── LIGHTBOX ──────────────────────────────
+function openLightbox(url, name) {
+  document.getElementById('lbImg').src = url;
+  document.getElementById('lbName').textContent = name;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', e => { if(e.target === document.getElementById('lightbox') || e.target === document.getElementById('lbImg')) closeLightbox(); });
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeLightbox(); });
+
+mc.addEventListener('click', e => {
+  if (Math.abs(dx) > 5 || Math.abs(dy) > 5) return;
+  const item = filteredQueue[filteredIdx];
+  if (item?.type !== 'single') return;
+  openLightbox(cardUrl, allFiles[item.index].name);
+});
+
+// ── UTILS ─────────────────────────────────
+function fmtSz(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(2)+' GB';}
+function raf(){return new Promise(r=>requestAnimationFrame(r));}
+let tT;function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2600);}
+</script>
+</body>
+</html>
